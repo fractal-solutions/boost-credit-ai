@@ -219,8 +219,8 @@ class NeuralNetwork {
             const averageLoss = totalLoss / trainingData.length;
             losses.push(averageLoss);
 
-            // Log every nth epoch based on total epochs
-            if (logEpoch && epoch % Math.max(1, Math.floor(epochs/100)) === 0) {
+            // Log every 10% of total epochs
+            if (logEpoch && (epoch + 1) % Math.max(1, Math.floor(epochs/10)) === 0) {
                 log(`Epoch ${epoch + 1}/${epochs}`);
                 log(`Loss: ${averageLoss.toFixed(8)}`);
                 log(`Progress: ${((epoch + 1)/epochs * 100).toFixed(1)}%`);
