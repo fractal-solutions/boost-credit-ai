@@ -1,5 +1,6 @@
 const { XGBoost } = require('./xgboost.js');
 import NeuralNetwork from './neural_network.js';
+import { CreditRegressor, OrdinalCreditClassifier } from './neural_network_models.js';
 
 // Feature definitions and thresholds for good credit
 const THRESHOLDS = {
@@ -14,7 +15,7 @@ const THRESHOLDS = {
 };
 
 // Define normalization ranges at the top level
-const FEATURE_RANGES = [
+export const FEATURE_RANGES = [
     [0, 50],    // Annual Revenue
     [0, 3],     // Debt to Equity
     [0, 1],     // Payment History
@@ -239,28 +240,6 @@ function probabilityToCreditScore(probability) {
 console.log('\nCredit Score Predictions:');
 console.log('=========================\n');
 
-X_test.forEach((test, index) => {
-    const probability = predictionsBatch[index];
-    const creditScore = probabilityToCreditScore(probability);
-    const features = test.features;
-    
-    console.log(`Test Scenario ${index + 1}: ${test.scenario}`);
-    console.log(`Expected Outcome: ${test.expectedOutcome.toUpperCase()}`);
-    console.log('Business Metrics:');
-    console.log(`- Annual Revenue: KES ${features[0]}M`);
-    console.log(`- Debt to Equity: ${features[1]}`);
-    console.log(`- Payment History: ${(features[2] * 100).toFixed(1)}%`);
-    console.log(`- Cash Reserves: $${features[3]}M`);
-    console.log(`- Years in Business: ${features[4]}`);
-    console.log(`- Industry Risk Score: ${features[5]}/10`);
-    console.log(`- Late Payments: ${features[6]}`);
-    console.log(`- Credit Utilization: ${(features[7] * 100).toFixed(1)}%`);
-    console.log('\nPrediction Results:');
-    console.log(`- Raw Score: ${probability.toFixed(3)}`);
-    console.log(`- Credit Score: ${creditScore}`);
-    console.log(`- Classification: ${probability >= 0.5 ? 'GOOD' : 'BAD'}`);
-    console.log('\n' + '='.repeat(50) + '\n');
-});
 
 // Threshold Analysis
 const checkThresholds = (features) => {
@@ -319,7 +298,7 @@ featureImportance.forEach(({ feature, importance }) => {
 });
 
 // Create training data for neural network with actual credit scores
-function calculateBaseScore(features, thresholds) {
+function calculateBaseScore(features, thresholds, raw = false) {
     const meetsThresholds = [
         features[0] >= thresholds.MIN_ANNUAL_REVENUE,
         features[1] <= thresholds.MAX_DEBT_TO_EQUITY,
@@ -341,13 +320,13 @@ function calculateBaseScore(features, thresholds) {
     const riskPenalty = features[5] > thresholds.MAX_INDUSTRY_RISK ? -30 : 0;
     const utilizationPenalty = features[7] > thresholds.MAX_CREDIT_UTILIZATION ? -20 : 0;
     
-    return Math.min(850, Math.max(90, 
+    return Math.min(850, Math.max(raw === true? 90 : 300, 
         baseScore + revenueBonus + paymentHistoryBonus + riskPenalty + utilizationPenalty
     ));
 }
 
 // Function to normalize features
-function normalizeFeatures(features) {
+export function normalizeFeatures(features) {
     return features.map((value, index) => 
         Math.min(1, Math.max(0, value / FEATURE_RANGES[index][1]))
     );
@@ -365,7 +344,7 @@ const normalizedX_train = processedX_train.map(features =>
 
 // Prepare neural network training data
 const nnTrainingData = normalizedX_train.map((normalizedFeatures, index) => {
-    const baseScore = calculateBaseScore(processedX_train[index], THRESHOLDS);
+    const baseScore = calculateBaseScore(processedX_train[index], THRESHOLDS, true);
     // Normalize the credit score to [0,1] range for training
     const normalizedScore = (baseScore - 0) / (800 - 0);
     return {
@@ -383,29 +362,79 @@ const nn = new NeuralNetwork(
 );
 
 // Train neural network
-console.log('\nTraining Neural Network...');
+console.log('\nTraining Generic Neural Network...');
 nn.train(nnTrainingData, 0.001, 3000, true);
 
-// Test both models
-console.log('\nComparing Model Predictions:');
-console.log('============================\n');
 
+//NEURAL NETWORK MODELS
+// Initialize models
+const regressor = new CreditRegressor();
+const ordinalClassifier = new OrdinalCreditClassifier();
+
+// Convert binary scores to credit scores using base score calculation
+const creditScores = processedX_train.map(features => 
+    calculateBaseScore(features, THRESHOLDS)
+);
+const creditScoresRegressor = processedX_train.map(features => 
+    calculateBaseScore(features, THRESHOLDS, true)
+);
+
+// Train both models
+console.log('\nTraining Regressor Neural Network...');
+regressor.train(processedX_train, creditScoresRegressor);
+console.log('\nTraining Ordinal Classifier Neural Network...');
+ordinalClassifier.train(processedX_train, creditScores);
+
+//MODELS PREDICTIONS
+console.log('\nComparing Models Predictions:');
+console.log('============================\n');
+// Test predictions
 X_test.forEach((test, index) => {
+    
     const xgbProbability = predictionsBatch[index];
+    const creditScore = probabilityToCreditScore(xgbProbability);
+    const features = test.features;
     const xgbScore = probabilityToCreditScore(xgbProbability);
     
     // Get neural network prediction
     const normalizedFeatures = normalizeFeatures(test.features);
     const normalizedPrediction = nn.forward(normalizedFeatures)[0];
     const nnScore = denormalizeCreditScore(normalizedPrediction);
-    
-    console.log(`Test Scenario ${index + 1}: ${test.scenario}`);
-    console.log(`Expected Outcome: ${test.expectedOutcome.toUpperCase()}`);
+
+    //NN Models Predictions
+    const regressionResult = regressor.predict(test.features);
+    const ordinalResult = ordinalClassifier.predict(test.features);
+
+
+
+    console.log(`\nTest Scenario ${index + 1}: ${test.scenario}`);
+
+    console.log('Business Metrics:');
+    console.log(`- Annual Revenue: KES ${features[0]}M`);
+    console.log(`- Debt to Equity: ${features[1]}`);
+    console.log(`- Payment History: ${(features[2] * 100).toFixed(1)}%`);
+    console.log(`- Cash Reserves: KES ${features[3]}M`);
+    console.log(`- Years in Business: ${features[4]}`);
+    console.log(`- Industry Risk Score: ${features[5]}/10`);
+    console.log(`- Late Payments: ${features[6]}`);
+    console.log(`- Credit Utilization: ${(features[7] * 100).toFixed(1)}%`);
+
+    console.log(`\nExpected Outcome: ${test.expectedOutcome.toUpperCase()}`);
     console.log('\nModel Predictions:');
     console.log(`XGBoost: ${xgbScore} (${xgbProbability >= 0.5 ? 'GOOD' : 'BAD'})`);
     console.log(`Neural Network: ${nnScore > 850 ? 850 : nnScore} (${nnScore >= 680 ? 'GOOD' : 'BAD'})` );
     console.log(`Raw NN Output: ${(normalizedPrediction).toFixed(4)}`);
     console.log(`Difference: ${Math.abs(xgbScore - nnScore)}`);
-    console.log('\n' + '='.repeat(50) + '\n');
-});
 
+    console.log('\nRegression with Binning:');
+    console.log(`- Raw Score: ${regressionResult.score}`);
+    console.log(`- Category: ${regressionResult.category}`);
+    console.log(`- Range: ${regressionResult.range}`);
+    
+    console.log('\nOrdinal Classification:');
+    console.log(`- Score: ${ordinalResult.score}`);
+    console.log(`- Category: ${ordinalResult.category}`);
+    console.log(`- Range: ${ordinalResult.range}`);
+    console.log(`- Confidence: ${(ordinalResult.confidence * 100).toFixed(1)}%`);
+    console.log('\n' + '='.repeat(50));
+});
