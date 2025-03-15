@@ -165,6 +165,26 @@ const X_test = [
         expectedOutcome: "bad"
     },
     {
+        features: [9.0, 1.0, 0.97, 0.7, 8, 6, 4, 0.65],
+        scenario: "Strong payment history",
+        expectedOutcome: "good"
+    },
+    {
+        features: [15.0, 2.5, 0.88, 0.3, 7, 8, 5, 0.7],
+        scenario: "Fast-growing business with weak risk management",
+        expectedOutcome: "bad"
+    },
+    {
+        features: [4.0, 0.6, 0.94, 0.5, 6, 5, 3, 0.6],
+        scenario: "Small business with recent growth",
+        expectedOutcome: "good"
+    },
+    {
+        features: [18.0, 1.9, 0.85, 0.1, 8, 7, 6, 0.7],
+        scenario: "Established business with cash flow issues",
+        expectedOutcome: "bad"
+    },
+    {
         features: [10.0, 1.4, 0.92, 0.75, 5, 4, 3, 0.55],
         scenario: "Random test 1",
         expectedOutcome: "good"
@@ -182,6 +202,16 @@ const X_test = [
     {
         features: [2.0, 0.9, 0.89, 0.5, 5, 6, 3, 0.8],
         scenario: "Random test 4",
+        expectedOutcome: "bad"
+    },
+    {
+        features: [11.0, 1.3, 0.92, 0.6, 7, 6, 5, 0.75],
+        scenario: "Random test 5",
+        expectedOutcome: "good"
+    },
+    {
+        features: [3.0, 0.8, 0.95, 0.9, 6, 5, 4, 0.7],
+        scenario: "Random test 6",
         expectedOutcome: "bad"
     }
 ];
