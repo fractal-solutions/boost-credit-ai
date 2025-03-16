@@ -66,66 +66,58 @@ class OrdinalCreditClassifier {
     constructor() {
         this.nn = new NeuralNetwork(
             8,              // input features
-            [32, 16, 8],      // hidden layers
-            7,              // output (one per category)
-            'swish'
+            [64, 32, 16, 8],      // reduced hidden layers
+            7,             // output (one per category)
+            'relu'      // keep sigmoid for classification
         );
     }
 
     train(features, scores) {
-        // Convert scores to ordinal labels with boundary handling
-        const ordinalLabels = scores.map(score => {
-            // Handle scores below minimum range
-            if (score < CREDIT_BINS[0].min) {
-                return 0; // Very Poor
-            }
-            // Handle scores above maximum range
-            if (score > CREDIT_BINS[CREDIT_BINS.length - 1].max) {
-                return CREDIT_BINS.length - 1; // Exceptional
-            }
-            
+        // Convert scores to one-hot encoded vectors
+        const trainingData = features.map((feature, i) => {
+            const score = scores[i];
+            // Find the appropriate bin
             const bin = CREDIT_BINS.find(b => 
                 score >= b.min && score <= b.max
-            );
+            ) || (score < CREDIT_BINS[0].min ? CREDIT_BINS[0] : CREDIT_BINS[CREDIT_BINS.length - 1]);
             
-            // Fallback if no bin found (shouldn't happen with above checks)
-            return bin ? bin.ordinal : 0;
-        });
+            // Create one-hot encoded output
+            const output = Array(7).fill(0);
+            output[bin.ordinal] = 1; // Set only the correct bin to 1
 
-        // Create one-hot encoded targets with validation
-        const trainingData = features.map((feature, i) => {
-            const ordinal = ordinalLabels[i];
             return {
                 input: normalizeFeatures(feature),
-                output: Array(7).fill(0).map((_, j) => 
-                    j <= ordinal ? 1 : 0
-                )
+                output: output
             };
         });
 
-        this.nn.train(trainingData, 0.001, 2000, true);
+        this.nn.train(trainingData, 0.01, 2000, true); // Adjusted learning rate and epochs
     }
 
     predict(features) {
         const normalizedFeatures = normalizeFeatures(features);
         const predictions = this.nn.forward(normalizedFeatures);
         
-        // Convert ordinal outputs to credit category with validation
-        let ordinal = predictions.findIndex((p, i) => 
-            p < 0.5 && (i === 0 || predictions[i-1] >= 0.5)
-        ) - 1;
-
-        // Ensure ordinal is within valid range
-        ordinal = Math.max(0, Math.min(CREDIT_BINS.length - 1, ordinal));
+        // Find the highest probability category
+        const bestOrdinal = predictions.reduce((maxIdx, curr, idx, arr) => 
+            curr > arr[maxIdx] ? idx : maxIdx, 0);
         
-        const bin = CREDIT_BINS[ordinal];
-        const midScore = Math.round((bin.max + bin.min) / 2);
+        const bin = CREDIT_BINS[bestOrdinal];
+        const confidence = predictions[bestOrdinal];
+        
+        // Calculate weighted score within bin range
+        const binRange = bin.max - bin.min;
+        const baseScore = bin.min + (binRange * confidence);
+        
+        // Adjust score based on confidence
+        const score = Math.round(baseScore);
 
         return {
-            score: midScore,
+            score: Math.min(850, Math.max(300, score)),
             category: bin.label,
             range: `${bin.min}-${bin.max}`,
-            confidence: predictions[ordinal]
+            confidence: confidence,
+            predictions: predictions // Add raw predictions for debugging
         };
     }
 }

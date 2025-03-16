@@ -373,7 +373,7 @@ const ordinalClassifier = new OrdinalCreditClassifier();
 
 // Convert binary scores to credit scores using base score calculation
 const creditScores = processedX_train.map(features => 
-    calculateBaseScore(features, THRESHOLDS)
+    calculateBaseScore(features, THRESHOLDS, true)
 );
 const creditScoresRegressor = processedX_train.map(features => 
     calculateBaseScore(features, THRESHOLDS, true)
@@ -435,6 +435,7 @@ X_test.forEach((test, index) => {
     console.log(`- Score: ${ordinalResult.score}`);
     console.log(`- Category: ${ordinalResult.category}`);
     console.log(`- Range: ${ordinalResult.range}`);
+    //console.log(`- Raw Prediction: ${ordinalResult.predictions}`);
     console.log(`- Confidence: ${(ordinalResult.confidence * 100).toFixed(1)}%`);
     console.log('\n' + '='.repeat(50));
 });
