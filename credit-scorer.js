@@ -459,7 +459,7 @@ X_test.forEach((test, index) => {
     console.log(`- Range: ${ordinalResult.range}`);
     //console.log(`- Raw Prediction: ${ordinalResult.predictions}`);
     console.log(`- Confidence: ${(ordinalResult.confidence * 100).toFixed(1)}%`);
-    console.log(`\nFINAL CREDIT SCORE: ${probabilityToCreditScore(0.9 * rateResult.creditScore)}`);
+    console.log(`\nFINAL CREDIT SCORE: ${probabilityToCreditScore(0.8 * rateResult.creditScore)}`);
 
     // Add interest rate to output
     console.log('\nInterest Rate Analysis:');
