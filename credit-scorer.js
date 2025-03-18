@@ -420,7 +420,8 @@ X_test.forEach((test, index) => {
             paymentHistory: features[2],
             creditUtilization: features[7],
             cashReserves: features[3],
-            debtToEquity: features[1]
+            debtToEquity: features[1],
+            industryRisk: features[5] 
         };
 
 
@@ -440,7 +441,7 @@ X_test.forEach((test, index) => {
     console.log(`- Late Payments: ${features[6]}`);
     console.log(`- Credit Utilization: ${(features[7] * 100).toFixed(1)}%`);
 
-    console.log(`\nExpected Outcome: ${test.expectedOutcome.toUpperCase()}`);
+    console.log(`\nExpected Outcome (Quick Classification): ${test.expectedOutcome.toUpperCase()}`);
     console.log('\nModel Predictions:');
     console.log(`XGBoost: ${xgbScore} (${xgbProbability >= 0.5 ? 'GOOD' : 'BAD'})`);
     console.log(`Neural Network: ${nnScore > 850 ? 850 : nnScore} (${nnScore >= 680 ? 'GOOD' : 'BAD'})` );
@@ -458,6 +459,7 @@ X_test.forEach((test, index) => {
     console.log(`- Range: ${ordinalResult.range}`);
     //console.log(`- Raw Prediction: ${ordinalResult.predictions}`);
     console.log(`- Confidence: ${(ordinalResult.confidence * 100).toFixed(1)}%`);
+    console.log(`\nFINAL CREDIT SCORE: ${probabilityToCreditScore(0.9 * rateResult.creditScore)}`);
 
     // Add interest rate to output
     console.log('\nInterest Rate Analysis:');

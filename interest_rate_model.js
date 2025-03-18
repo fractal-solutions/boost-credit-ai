@@ -15,14 +15,16 @@ const INTEREST_RATE_FEATURES = {
         paymentHistory: [0, 1],
         creditUtilization: [0, 1],
         cashReserves: [0, 15],
-        debtToEquity: [0, 3]
+        debtToEquity: [0, 3],
+        industryRisk: [0, 10]  
     },
     
     // Interest rate ranges
     RATE_RANGES: {
-        min: 0.08,  // 8%
-        max: 0.39,  // 35%
-        baseline: 0.15  // 15%
+        min: 0.08,
+        max: 0.39,
+        baseline: 0.15,
+        industryRiskAdjustment: 0.02  // 2% per risk level above threshold
     }
 };
 
@@ -30,11 +32,12 @@ export class InterestRateModel {
     constructor() {
         // 8 inputs: 4 model scores + 4 key business metrics
         this.nn = new NeuralNetwork(
-            8,
+            9,
             [16, 8],
             1,
             'sigmoid'
         );
+        this.creditScore = 0;
     }
 
     normalizeInput(features) {
@@ -51,13 +54,15 @@ export class InterestRateModel {
             features.paymentHistory,
             features.creditUtilization,
             features.cashReserves / BUSINESS_METRICS.cashReserves[1],
-            features.debtToEquity / BUSINESS_METRICS.debtToEquity[1]
+            features.debtToEquity / BUSINESS_METRICS.debtToEquity[1],
+            features.industryRisk / BUSINESS_METRICS.industryRisk[1] 
         ];
     }
 
     calculateBaseRate(modelScores) {
         const {min, max, baseline} = INTEREST_RATE_FEATURES.RATE_RANGES;
         const avgScore = modelScores.reduce((a, b) => a + b, 0) / modelScores.length;
+        this.creditScore = avgScore;
         
         // Higher scores = lower rates
         return baseline + (1 - avgScore) * (max - min);
@@ -105,7 +110,8 @@ export class InterestRateModel {
             adjustedRate: (cappedFinalRate * 100).toFixed(2) + '%',
             confidence: normalizedConfidence.toFixed(1) + '%',
             riskFactors: this.analyzeRiskFactors(features),
-            riskMultiplier: riskMultiplier.toFixed(2)
+            riskMultiplier: riskMultiplier.toFixed(2),
+            creditScore: this.creditScore
         };
     }
 
@@ -129,6 +135,9 @@ export class InterestRateModel {
         // Debt-to-equity impact (0-12.5% adjustment)
         if (features.debtToEquity > 2.0) multiplier += 0.125;
         else if (features.debtToEquity > 1.5) multiplier += 0.075;
+
+        if (features.industryRisk > 7) multiplier += 0.15;  // High risk
+        else if (features.industryRisk > 5) multiplier += 0.075;  // Medium risk
         
         return multiplier;
     }
@@ -144,6 +153,13 @@ export class InterestRateModel {
             riskFactors.push('Payment History Concerns');
         if (features.cashReserves < 0.5) 
             riskFactors.push('Low Cash Reserves');
+
+        // industry risk factor
+        if (features.industryRisk > 7)
+            riskFactors.push('High Industry Risk');
+        else if (features.industryRisk > 5)
+            riskFactors.push('Moderate Industry Risk');
+                
         
         return riskFactors;
     }
