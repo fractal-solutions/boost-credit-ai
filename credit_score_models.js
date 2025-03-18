@@ -66,9 +66,9 @@ class OrdinalCreditClassifier {
     constructor() {
         this.nn = new NeuralNetwork(
             8,              // input features
-            [64, 32, 16, 8],      // reduced hidden layers
+            [64, 32, 16, 16, 8],      // reduced hidden layers
             7,             // output (one per category)
-            'relu'      // keep sigmoid for classification
+            'swish'      // keep sigmoid for classification
         );
     }
 

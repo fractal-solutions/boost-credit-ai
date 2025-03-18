@@ -1,6 +1,7 @@
 const { XGBoost } = require('./xgboost.js');
 import NeuralNetwork from './neural_network.js';
-import { CreditRegressor, OrdinalCreditClassifier } from './neural_network_models.js';
+import { CreditRegressor, OrdinalCreditClassifier } from './credit_score_models.js';
+import { InterestRateModel } from './interest_rate_model.js';
 
 // Feature definitions and thresholds for good credit
 const THRESHOLDS = {
@@ -387,7 +388,6 @@ ordinalClassifier.train(processedX_train, creditScores);
 
 // Initialize interest rate model
 console.log('\nSetting Up Interest Rate Model...');
-import { InterestRateModel } from './interest_rate_model.js';
 const interestModel = new InterestRateModel();
 
 //MODELS PREDICTIONS
@@ -462,7 +462,7 @@ X_test.forEach((test, index) => {
     console.log(`- Score: ${ordinalResult.score}`);
     console.log(`- Category: ${ordinalResult.category}`);
     console.log(`- Range: ${ordinalResult.range}`);
-    //console.log(`- Raw Prediction: ${ordinalResult.predictions}`);
+    console.log(`- Raw Predictions: ${ordinalResult.predictions}`);
     console.log(`- Confidence: ${(ordinalResult.confidence * 100).toFixed(1)}%`);
     console.log(`\nFINAL CREDIT SCORE: ${(0.995 * (nnScore + regressionResult.score) / 2).toFixed(0)}`);
 
