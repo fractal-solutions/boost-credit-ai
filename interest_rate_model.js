@@ -4,7 +4,7 @@ import NeuralNetwork from './neural_network.js';
 const INTEREST_RATE_FEATURES = {
     // Model scores (normalized to 0-1)
     MODEL_SCORES: {
-        xgboost: [300, 850],
+        xgboost: [0, 1150],
         neuralNetwork: [300, 850],
         regression: [300, 850],
         ordinal: [300, 850]
@@ -61,8 +61,9 @@ export class InterestRateModel {
 
     calculateBaseRate(modelScores) {
         const {min, max, baseline} = INTEREST_RATE_FEATURES.RATE_RANGES;
+        this.creditScore = (modelScores[1] + modelScores[2])/2;
         const avgScore = modelScores.reduce((a, b) => a + b, 0) / modelScores.length;
-        this.creditScore = avgScore;
+        
         
         // Higher scores = lower rates
         return baseline + (1 - avgScore) * (max - min);
@@ -82,6 +83,13 @@ export class InterestRateModel {
         const prediction = this.nn.forward(normalizedInput)[0];
         
         // Get base rate from model scores
+        // const baseRate = this.calculateBaseRate([
+        //     features.xgboostScore,
+        //     features.nnScore,
+        //     features.regressionScore,
+        //     features.ordinalScore
+        // ].map(score => (score - 300) / (850 - 300)));
+
         const baseRate = this.calculateBaseRate([
             features.xgboostScore,
             features.nnScore,

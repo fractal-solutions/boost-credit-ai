@@ -442,24 +442,29 @@ X_test.forEach((test, index) => {
     console.log(`- Credit Utilization: ${(features[7] * 100).toFixed(1)}%`);
 
     console.log(`\nExpected Outcome (Quick Classification): ${test.expectedOutcome.toUpperCase()}`);
-    console.log('\nModel Predictions:');
-    console.log(`XGBoost: ${xgbScore} (${xgbProbability >= 0.5 ? 'GOOD' : 'BAD'})`);
-    console.log(`Neural Network: ${nnScore > 850 ? 850 : nnScore} (${nnScore >= 680 ? 'GOOD' : 'BAD'})` );
-    console.log(`Raw NN Output: ${(normalizedPrediction).toFixed(4)}`);
-    console.log(`Difference: ${Math.abs(xgbScore - nnScore)}`);
+    console.log('\nModel Predictions: (Threshold: 680)');
+    console.log('=====================');
+    console.log(`XGBoost: `);
+    console.log(`- Category: ${xgbProbability >= 0.5 ? 'GOOD' : 'BAD'}`);
+    console.log(`- Probability: ${(xgbProbability * 100).toFixed(1)}%`);
 
-    console.log('\nRegression with Binning:');
+    console.log(`\nNeural Network: ${nnScore > 850 ? 850 : nnScore}` );
+    console.log(`- Score: ${nnScore > 850 ? 850 : nnScore}`);
+    console.log(`- Category: ${nnScore >= 680 ? 'GOOD' : 'BAD'} `);
+    console.log(`Raw NN Output: ${(normalizedPrediction).toFixed(4)}`);
+
+    console.log('\nNeural Network Regression with Binning:');
     console.log(`- Raw Score: ${regressionResult.score}`);
     console.log(`- Category: ${regressionResult.category}`);
     console.log(`- Range: ${regressionResult.range}`);
     
-    console.log('\nOrdinal Classification:');
+    console.log('\nNeural Network Ordinal Classification:');
     console.log(`- Score: ${ordinalResult.score}`);
     console.log(`- Category: ${ordinalResult.category}`);
     console.log(`- Range: ${ordinalResult.range}`);
     //console.log(`- Raw Prediction: ${ordinalResult.predictions}`);
     console.log(`- Confidence: ${(ordinalResult.confidence * 100).toFixed(1)}%`);
-    console.log(`\nFINAL CREDIT SCORE: ${probabilityToCreditScore(0.8 * rateResult.creditScore)}`);
+    console.log(`\nFINAL CREDIT SCORE: ${(0.995 * (nnScore + regressionResult.score) / 2).toFixed(0)}`);
 
     // Add interest rate to output
     console.log('\nInterest Rate Analysis:');
