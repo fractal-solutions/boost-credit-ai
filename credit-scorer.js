@@ -385,6 +385,11 @@ regressor.train(processedX_train, creditScoresRegressor);
 console.log('\nTraining Ordinal Classifier Neural Network...');
 ordinalClassifier.train(processedX_train, creditScores);
 
+// Initialize interest rate model
+console.log('\nSetting Up Interest Rate Model...');
+import { InterestRateModel } from './interest_rate_model.js';
+const interestModel = new InterestRateModel();
+
 //MODELS PREDICTIONS
 console.log('\nComparing Models Predictions:');
 console.log('============================\n');
@@ -406,7 +411,23 @@ X_test.forEach((test, index) => {
     const ordinalResult = ordinalClassifier.predict(test.features);
 
 
+        // Prepare features for interest rate model
+        const interestRateFeatures = {
+            xgboostScore: xgbScore,
+            nnScore: nnScore,
+            regressionScore: regressionResult.score,
+            ordinalScore: ordinalResult.score,
+            paymentHistory: features[2],
+            creditUtilization: features[7],
+            cashReserves: features[3],
+            debtToEquity: features[1]
+        };
 
+
+    // Get interest rate prediction
+    const rateResult = interestModel.predict(interestRateFeatures);
+
+    // Display results
     console.log(`\nTest Scenario ${index + 1}: ${test.scenario}`);
 
     console.log('Business Metrics:');
@@ -437,5 +458,17 @@ X_test.forEach((test, index) => {
     console.log(`- Range: ${ordinalResult.range}`);
     //console.log(`- Raw Prediction: ${ordinalResult.predictions}`);
     console.log(`- Confidence: ${(ordinalResult.confidence * 100).toFixed(1)}%`);
+
+    // Add interest rate to output
+    console.log('\nInterest Rate Analysis:');
+    console.log(`- Base Rate: ${rateResult.baseRate}`);
+    console.log(`- Final Rate: ${rateResult.adjustedRate}`);
+    console.log(`- Confidence: ${rateResult.confidence}`);
+    if (rateResult.riskFactors.length > 0) {
+        console.log('- Risk Factors:');
+        rateResult.riskFactors.forEach(factor => 
+            console.log(`  * ${factor}`)
+        );
+    }
     console.log('\n' + '='.repeat(50));
 });
