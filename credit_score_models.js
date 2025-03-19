@@ -66,9 +66,9 @@ class OrdinalCreditClassifier {
     constructor() {
         this.nn = new NeuralNetwork(
             8,              // input features
-            [64, 32, 16, 16, 8],      // reduced hidden layers
+            [32, 16],      // reduced hidden layers
             7,             // output (one per category)
-            'swish'      // keep sigmoid for classification
+            'relu'      // keep sigmoid for classification
         );
     }
 
@@ -82,8 +82,8 @@ class OrdinalCreditClassifier {
             ) || (score < CREDIT_BINS[0].min ? CREDIT_BINS[0] : CREDIT_BINS[CREDIT_BINS.length - 1]);
             
             // Create one-hot encoded output
-            const output = Array(7).fill(0);
-            output[bin.ordinal] = 1; // Set only the correct bin to 1
+            const output = Array(7).fill(0.01);
+            output[bin.ordinal] = 0.95; // Set only the correct bin to 1
 
             return {
                 input: normalizeFeatures(feature),
@@ -94,17 +94,26 @@ class OrdinalCreditClassifier {
         this.nn.train(trainingData, 0.01, 2000, true); // Adjusted learning rate and epochs
     }
 
+    preprocessFeatures(features) {
+        // Normalize and scale features to prevent extreme values
+        const normalized = normalizeFeatures(features);
+        return normalized.map(v => v * 0.8 + 0.1); // Scale to [0.1, 0.9] range
+    }
+
     predict(features) {
-        const normalizedFeatures = normalizeFeatures(features);
+        const normalizedFeatures = this.preprocessFeatures(features);
         const predictions = this.nn.forward(normalizedFeatures);
-        
+
+        // Softmax the predictions for better probability distribution
+        const softmaxPredictions = this.softmax(predictions);
+          
         // Find the highest probability category
-        const bestOrdinal = predictions.reduce((maxIdx, curr, idx, arr) => 
+        const bestOrdinal = softmaxPredictions.reduce((maxIdx, curr, idx, arr) => 
             curr > arr[maxIdx] ? idx : maxIdx, 0);
-        
+         
         const bin = CREDIT_BINS[bestOrdinal];
-        const confidence = predictions[bestOrdinal];
-        
+        const confidence = softmaxPredictions[bestOrdinal];
+       
         // Calculate weighted score within bin range
         const binRange = bin.max - bin.min;
         const baseScore = bin.min + (binRange * confidence);
@@ -117,8 +126,16 @@ class OrdinalCreditClassifier {
             category: bin.label,
             range: `${bin.min}-${bin.max}`,
             confidence: confidence,
-            predictions: predictions // Add raw predictions for debugging
+            predictions: softmaxPredictions // Add raw predictions for debugging
         };
+    }
+
+    // Softmax function for better probability distribution
+    softmax(logits) {
+        const maxLogit = Math.max(...logits);
+        const scores = logits.map(l => Math.exp(l - maxLogit));
+        const sum = scores.reduce((a, b) => a + b, 0);
+        return scores.map(s => s / sum);
     }
 }
 

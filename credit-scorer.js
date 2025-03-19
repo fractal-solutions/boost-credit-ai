@@ -377,7 +377,7 @@ const creditScores = processedX_train.map(features =>
     calculateBaseScore(features, THRESHOLDS, true)
 );
 const creditScoresRegressor = processedX_train.map(features => 
-    calculateBaseScore(features, THRESHOLDS, true)
+    calculateBaseScore(features, THRESHOLDS, false)
 );
 
 // Train both models
