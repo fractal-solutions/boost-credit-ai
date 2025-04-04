@@ -21,9 +21,9 @@ const INTEREST_RATE_FEATURES = {
     
     // Interest rate ranges
     RATE_RANGES: {
-        min: 0.08,
+        min: 0.00,
         max: 0.39,
-        baseline: 0.15,
+        baseline: 0.10,
         industryRiskAdjustment: 0.02  // 2% per risk level above threshold
     }
 };

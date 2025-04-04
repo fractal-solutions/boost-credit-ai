@@ -15,6 +15,34 @@ const THRESHOLDS = {
     MAX_CREDIT_UTILIZATION: 0.65   // 65% maximum
 };
 
+//FICO SBSS Model weights
+const MODIFIED_SBSS_WEIGHTS = {
+    PAYMENT_BEHAVIOR: {
+        weight: 0.35,
+        metrics: {
+            paymentHistory: 0.50,
+            latePayments: 0.30,
+            creditUtilization: 0.20
+        }
+    },
+    BUSINESS_FUNDAMENTALS: {
+        weight: 0.35,
+        metrics: {
+            annualRevenue: 0.40,
+            cashReserves: 0.35,
+            debtToEquity: 0.25
+        }
+    },
+    RISK_FACTORS: {
+        weight: 0.30,
+        metrics: {
+            industryRisk: 0.40,
+            yearsInBusiness: 0.35,
+            creditHistory: 0.25
+        }
+    }
+};
+
 // Define normalization ranges at the top level
 export const FEATURE_RANGES = [
     [0, 50],    // Annual Revenue
@@ -326,6 +354,83 @@ function calculateBaseScore(features, thresholds, raw = false) {
     ));
 }
 
+function calculateStandardizedScore(features) {
+    // Base score starts at 300
+    let baseScore = 300;
+    const maxPoints = 550; // Points available above base score
+    
+    // Payment Behavior (35% of additional points = 192.5 points)
+    const paymentScore = (
+        // Payment history (50% of 192.5 = 96.25 points)
+        (features[2] >= 0.95 ? 1.0 : 
+         features[2] >= 0.90 ? 0.8 :
+         features[2] >= 0.85 ? 0.6 :
+         features[2] >= 0.80 ? 0.4 : 0.2) * 96.25 +
+        
+        // Late payments (30% of 192.5 = 57.75 points)
+        ((THRESHOLDS.MAX_LATE_PAYMENTS - features[6]) / THRESHOLDS.MAX_LATE_PAYMENTS) * 57.75 +
+        
+        // Credit utilization (20% of 192.5 = 38.5 points)
+        (features[7] <= 0.3 ? 1.0 :
+         features[7] <= 0.5 ? 0.8 :
+         features[7] <= 0.7 ? 0.6 :
+         features[7] <= 0.8 ? 0.4 : 0.2) * 38.5
+    );
+
+    // Business Fundamentals (35% of additional points = 192.5 points)
+    const businessScore = (
+        // Annual revenue (40% of 192.5 = 77 points)
+        (features[0] >= THRESHOLDS.MIN_ANNUAL_REVENUE * 5 ? 1.0 :
+         features[0] >= THRESHOLDS.MIN_ANNUAL_REVENUE * 3 ? 0.8 :
+         features[0] >= THRESHOLDS.MIN_ANNUAL_REVENUE * 2 ? 0.6 :
+         features[0] >= THRESHOLDS.MIN_ANNUAL_REVENUE ? 0.4 : 0.2) * 77 +
+        
+        // Cash reserves (35% of 192.5 = 67.375 points)
+        (features[3] >= THRESHOLDS.MIN_CASH_RESERVES * 3 ? 1.0 :
+         features[3] >= THRESHOLDS.MIN_CASH_RESERVES * 2 ? 0.8 :
+         features[3] >= THRESHOLDS.MIN_CASH_RESERVES * 1.5 ? 0.6 :
+         features[3] >= THRESHOLDS.MIN_CASH_RESERVES ? 0.4 : 0.2) * 67.375 +
+        
+        // Debt to equity (25% of 192.5 = 48.125 points)
+        (features[1] <= THRESHOLDS.MAX_DEBT_TO_EQUITY * 0.5 ? 1.0 :
+         features[1] <= THRESHOLDS.MAX_DEBT_TO_EQUITY * 0.75 ? 0.8 :
+         features[1] <= THRESHOLDS.MAX_DEBT_TO_EQUITY ? 0.6 :
+         features[1] <= THRESHOLDS.MAX_DEBT_TO_EQUITY * 1.5 ? 0.4 : 0.2) * 48.125
+    );
+
+    // Risk Factors (30% of additional points = 165 points)
+    const riskScore = (
+        // Industry risk (40% of 165 = 66 points)
+        (features[5] <= THRESHOLDS.MAX_INDUSTRY_RISK * 0.5 ? 1.0 :
+         features[5] <= THRESHOLDS.MAX_INDUSTRY_RISK * 0.75 ? 0.8 :
+         features[5] <= THRESHOLDS.MAX_INDUSTRY_RISK ? 0.6 :
+         features[5] <= THRESHOLDS.MAX_INDUSTRY_RISK * 1.25 ? 0.4 : 0.2) * 66 +
+        
+        // Years in business (35% of 165 = 57.75 points)
+        (features[4] >= THRESHOLDS.MIN_YEARS_IN_BUSINESS * 3 ? 1.0 :
+         features[4] >= THRESHOLDS.MIN_YEARS_IN_BUSINESS * 2 ? 0.8 :
+         features[4] >= THRESHOLDS.MIN_YEARS_IN_BUSINESS * 1.5 ? 0.6 :
+         features[4] >= THRESHOLDS.MIN_YEARS_IN_BUSINESS ? 0.4 : 0.2) * 57.75 +
+        
+        // Credit history using payment history (25% of 165 = 41.25 points)
+        (features[2] >= 0.95 ? 1.0 :
+         features[2] >= 0.90 ? 0.8 :
+         features[2] >= 0.85 ? 0.6 :
+         features[2] >= 0.80 ? 0.4 : 0.2) * 41.25
+    );
+
+    // Debug logging
+    // console.log(`Score Components:
+    //     Payment Score: ${paymentScore.toFixed(2)} / 192.50
+    //     Business Score: ${businessScore.toFixed(2)} / 192.50
+    //     Risk Score: ${riskScore.toFixed(2)} / 165.00
+    //     Total Additional Points: ${(paymentScore + businessScore + riskScore).toFixed(2)} / 550
+    // `);
+
+    const finalScore = Math.round(baseScore + paymentScore + businessScore + riskScore);
+    return Math.min(850, Math.max(300, finalScore));
+}
+
 // Function to normalize features
 export function normalizeFeatures(features) {
     return features.map((value, index) => 
@@ -377,7 +482,7 @@ const creditScores = processedX_train.map(features =>
     calculateBaseScore(features, THRESHOLDS, true)
 );
 const creditScoresRegressor = processedX_train.map(features => 
-    calculateBaseScore(features, THRESHOLDS, false)
+    calculateStandardizedScore(features)//, THRESHOLDS, false)
 );
 
 // Train both models
@@ -441,7 +546,9 @@ X_test.forEach((test, index) => {
     console.log(`- Late Payments: ${features[6]}`);
     console.log(`- Credit Utilization: ${(features[7] * 100).toFixed(1)}%`);
 
-    console.log(`\nExpected Outcome (Quick Classification): ${test.expectedOutcome.toUpperCase()}`);
+    console.log(`\nQuick Classification: ${test.expectedOutcome.toUpperCase()}`);
+    console.log(`\nExpected Outcome (FICO SBSS Standardized Classification): ${calculateStandardizedScore(features)}`);
+    console.log(`- Expected Category: ${calculateStandardizedScore(features) >= 680 ? 'GOOD' : 'BAD'}`);
     console.log('\nModel Predictions: (Threshold: 680)');
     console.log('=====================');
     console.log(`XGBoost: `);
@@ -464,7 +571,7 @@ X_test.forEach((test, index) => {
     console.log(`- Range: ${ordinalResult.range}`);
     console.log(`- Raw Predictions: ${ordinalResult.predictions}`);
     console.log(`- Confidence: ${(ordinalResult.confidence * 100).toFixed(1)}%`);
-    console.log(`\nFINAL CREDIT SCORE: ${(0.995 * (nnScore + regressionResult.score) / 2).toFixed(0)}`);
+    console.log(`\nFINAL CREDIT SCORE: ${(0.995 * (nnScore + regressionResult.score + (0.95 *ordinalResult.score)) / 3).toFixed(0)}`);
 
     // Add interest rate to output
     console.log('\nInterest Rate Analysis:');
