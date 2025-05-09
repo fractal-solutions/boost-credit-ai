@@ -728,7 +728,7 @@ Bun.serve({
   }
 });
 
-console.log(`Credit scoring API running on port 2226`);
+console.log(`\n\nCredit scoring API running on port 2226`);
 console.log(`Send request with features array to get predictions:
 POST /predict
 {
