@@ -21,16 +21,16 @@ const MODIFIED_SBSS_WEIGHTS = {
         weight: 0.35,
         metrics: {
             paymentHistory: 0.50,
-            latePayments: 0.30,
-            creditUtilization: 0.20
+            latePayments: 0.15,
+            creditUtilization: 0.35
         }
     },
     BUSINESS_FUNDAMENTALS: {
         weight: 0.35,
         metrics: {
-            annualRevenue: 0.40,
+            annualRevenue: 0.30,
             cashReserves: 0.35,
-            debtToEquity: 0.25
+            debtToEquity: 0.35
         }
     },
     RISK_FACTORS: {
@@ -433,10 +433,11 @@ function calculateStandardizedScore(features) {
 
 // Function to normalize features
 export function normalizeFeatures(features) {
-    return features.map((value, index) => 
+    return features.map((value, index) =>
         Math.min(1, Math.max(0, value / FEATURE_RANGES[index][1]))
     );
 }
+
 
 // Function to denormalize credit score
 function denormalizeCreditScore(normalizedScore) {
@@ -586,3 +587,146 @@ X_test.forEach((test, index) => {
     }
     console.log('\n' + '='.repeat(50));
 });
+
+
+/**
+ * Makes predictions using all available models and returns results in API-friendly JSON format
+ * @param {Array} features - Array of 8 feature values in order:
+ *    [annualRevenue, debtToEquity, paymentHistory, cashReserves,
+ *     yearsInBusiness, industryRisk, latePayments, creditUtilization]
+ * @returns {Object} Prediction results from all models in consolidated format
+ */
+export function predictAll(features) {
+    // Get XGBoost prediction
+    const xgbProbability = model.predict([features])[0];
+    const xgbScore = probabilityToCreditScore(xgbProbability);
+
+    // Get neural network prediction
+    const normalizedFeatures = normalizeFeatures(features);
+    const normalizedPrediction = nn.forward(normalizedFeatures)[0];
+    const nnScore = denormalizeCreditScore(normalizedPrediction);
+
+    // Get other model predictions
+    const regressionResult = regressor.predict(features);
+    const ordinalResult = ordinalClassifier.predict(features);
+
+    // Prepare features for interest rate model
+    const interestRateFeatures = {
+        xgboostScore: xgbScore,
+        nnScore: nnScore,
+        regressionScore: regressionResult.score,
+        ordinalScore: ordinalResult.score,
+        paymentHistory: features[2],
+        creditUtilization: features[7],
+        cashReserves: features[3],
+        debtToEquity: features[1],
+        industryRisk: features[5]
+    };
+
+    // Get interest rate prediction
+    const rateResult = interestModel.predict(interestRateFeatures);
+
+    // Return consolidated results
+    return {
+        features: {
+            annualRevenue: features[0],
+            debtToEquity: features[1],
+            paymentHistory: features[2],
+            cashReserves: features[3],
+            yearsInBusiness: features[4],
+            industryRisk: features[5],
+            latePayments: features[6],
+            creditUtilization: features[7]
+        },
+        predictions: {
+            xgboost: {
+                probability: xgbProbability,
+                score: xgbScore,
+                category: xgbProbability >= 0.5 ? 'GOOD' : 'BAD'
+            },
+            neuralNetwork: {
+                score: nnScore > 850 ? 850 : nnScore,
+                category: nnScore >= 680 ? 'GOOD' : 'BAD',
+                rawOutput: normalizedPrediction
+            },
+            regression: {
+                score: regressionResult.score,
+                category: regressionResult.category,
+                range: regressionResult.range
+            },
+            ordinalClassification: {
+                score: ordinalResult.score,
+                category: ordinalResult.category,
+                range: ordinalResult.range,
+                confidence: ordinalResult.confidence,
+                rawPredictions: ordinalResult.predictions
+            },
+            interestRate: {
+                baseRate: rateResult.baseRate,
+                finalRate: rateResult.adjustedRate,
+                confidence: rateResult.confidence,
+                riskFactors: rateResult.riskFactors
+            },
+            finalScore: Math.round((0.995 * (nnScore + regressionResult.score + (0.95 * ordinalResult.score)) / 3))
+        },
+        thresholdsMet: checkThresholds(features),
+        standardizedScore: calculateStandardizedScore(features)
+    };
+}
+
+// API Server Configuration
+Bun.serve({
+  port: 2226,
+  routes: {
+    "/predict": {
+      POST: async (req) => {
+        try {
+          const body = await req.json();
+          
+          // Validate input
+          if (!body.features || !Array.isArray(body.features)) {
+            return Response.json(
+              { error: "Features array is required" },
+              { status: 400 }
+            );
+          }
+          
+          if (body.features.length !== 8) {
+            return Response.json(
+              { error: "Exactly 8 features are required" },
+              { status: 400 }
+            );
+          }
+          
+          // Make prediction
+          const prediction = predictAll(body.features);
+          
+          return Response.json({
+            success: true,
+            prediction
+          });
+          
+        } catch (error) {
+          return Response.json(
+            { error: error.message },
+            { status: 500 }
+          );
+        }
+      }
+    },
+    
+    // Health check endpoint
+    "/health": new Response("OK"),
+    
+    // 404 handler for unmatched API routes
+    "/*": Response.json({ message: "Not found" }, { status: 404 }),
+  },
+  
+  // Fallback for non-API routes
+  fetch(req) {
+    return new Response("Not Found", { status: 404 });
+  }
+});
+
+console.log(`Credit scoring API running on port 2226`);
+console.log(`POST /api/predict with features array to get predictions`);
