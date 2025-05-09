@@ -729,4 +729,8 @@ Bun.serve({
 });
 
 console.log(`Credit scoring API running on port 2226`);
-console.log(`POST /api/predict with features array to get predictions`);
+console.log(`Send request with features array to get predictions:
+POST /predict
+{
+  "features": [5.0, 0.5, 0.94, 0.8, 4, 4, 1, 0.4]
+}`);
