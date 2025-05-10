@@ -1,4 +1,5 @@
 import NeuralNetwork from './neural_network.js';
+import { calculateFinalCreditScore } from './credit-scorer.js';
 
 // Define interest rate relevant features and ranges
 const INTEREST_RATE_FEATURES = {
@@ -59,14 +60,14 @@ export class InterestRateModel {
         ];
     }
 
-    calculateBaseRate(modelScores) {
+    calculateBaseRate(creditScore) {
         const {min, max, baseline} = INTEREST_RATE_FEATURES.RATE_RANGES;
-        this.creditScore = (modelScores[1] + modelScores[2])/2;
-        const avgScore = modelScores.reduce((a, b) => a + b, 0) / modelScores.length;
+        const maxCreditScore = 850;
+        this.creditScore = creditScore;
         
         
         // Higher scores = lower rates
-        return baseline + (1 - avgScore) * (max - min);
+        return baseline + (1 - (creditScore / maxCreditScore)) * (max - min);
     }
 
     train(trainingData) {
@@ -81,21 +82,11 @@ export class InterestRateModel {
     predict(features) {
         const normalizedInput = this.normalizeInput(features);
         const prediction = this.nn.forward(normalizedInput)[0];
-        
-        // Get base rate from model scores
-        // const baseRate = this.calculateBaseRate([
-        //     features.xgboostScore,
-        //     features.nnScore,
-        //     features.regressionScore,
-        //     features.ordinalScore
-        // ].map(score => (score - 300) / (850 - 300)));
 
-        const baseRate = this.calculateBaseRate([
-            features.xgboostScore,
-            features.nnScore,
-            features.regressionScore,
-            features.ordinalScore
-        ].map(score => (score - 300) / (850 - 300)));
+        const finalCreditScore = calculateFinalCreditScore(features.nnScore, features.regressionScore, features.ordinalScore, features.ficoScore, features.xgboostScore)
+
+        const baseRate = this.calculateBaseRate(finalCreditScore);
+        
 
         // Calculate risk multiplier with reduced impact
         const riskMultiplier = this.calculateRiskMultiplier(features);

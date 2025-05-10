@@ -17,7 +17,7 @@ class CreditRegressor {
             8,              // input features
             [32, 16, 8],   // hidden layers
             1,              // output (credit score)
-            'swish'
+            'sigmoid'
         );
     }
 

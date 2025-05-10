@@ -3,7 +3,7 @@ import NeuralNetwork from './neural_network.js';
 import { CreditRegressor, OrdinalCreditClassifier } from './credit_score_models.js';
 import { InterestRateModel } from './interest_rate_model.js';
 
-// Feature definitions and thresholds for good credit
+// Feature definitions and thresholds for good credit (Quick Classification Observation)
 const THRESHOLDS = {
     MIN_ANNUAL_REVENUE: 1.0,       // Millions
     MAX_DEBT_TO_EQUITY: 1.3,       // Ratio
@@ -482,15 +482,15 @@ const ordinalClassifier = new OrdinalCreditClassifier();
 const creditScores = processedX_train.map(features => 
     calculateBaseScore(features, THRESHOLDS, true)
 );
-const creditScoresRegressor = processedX_train.map(features => 
+const creditScoresFICO = processedX_train.map(features => 
     calculateStandardizedScore(features)//, THRESHOLDS, false)
 );
 
 // Train both models
 console.log('\nTraining Regressor Neural Network...');
-regressor.train(processedX_train, creditScoresRegressor);
+regressor.train(processedX_train, creditScoresFICO);
 console.log('\nTraining Ordinal Classifier Neural Network...');
-ordinalClassifier.train(processedX_train, creditScores);
+ordinalClassifier.train(processedX_train, creditScoresFICO);
 
 // Initialize interest rate model
 console.log('\nSetting Up Interest Rate Model...');
@@ -516,13 +516,17 @@ X_test.forEach((test, index) => {
     const regressionResult = regressor.predict(test.features);
     const ordinalResult = ordinalClassifier.predict(test.features);
 
+    //Ensemble Reults
+    const ficoScore = calculateStandardizedScore(features);
+
 
         // Prepare features for interest rate model
         const interestRateFeatures = {
-            xgboostScore: xgbScore,
+            xgboostScore: xgbProbability,
             nnScore: nnScore,
             regressionScore: regressionResult.score,
             ordinalScore: ordinalResult.score,
+            ficoScore: ficoScore,
             paymentHistory: features[2],
             creditUtilization: features[7],
             cashReserves: features[3],
@@ -572,13 +576,13 @@ X_test.forEach((test, index) => {
     console.log(`- Range: ${ordinalResult.range}`);
     console.log(`- Raw Predictions: ${ordinalResult.predictions}`);
     console.log(`- Confidence: ${(ordinalResult.confidence * 100).toFixed(1)}%`);
-    console.log(`\nFINAL CREDIT SCORE: ${(0.995 * (nnScore + regressionResult.score + (0.95 *ordinalResult.score)) / 3).toFixed(0)}`);
+    console.log(`\nFINAL CREDIT SCORE: ${calculateFinalCreditScore(nnScore, regressionResult.score, ordinalResult.score, ficoScore, xgbProbability)}`); //(0.995 * (nnScore + regressionResult.score + ordinalResult.score) / 3).toFixed(0)}`);
 
     // Add interest rate to output
     console.log('\nInterest Rate Analysis:');
     console.log(`- Base Rate: ${rateResult.baseRate}`);
     console.log(`- Final Rate: ${rateResult.adjustedRate}`);
-    console.log(`- Confidence: ${rateResult.confidence}`);
+    console.log(`- Risk Multiplier: ${rateResult.riskMultiplier}`);
     if (rateResult.riskFactors.length > 0) {
         console.log('- Risk Factors:');
         rateResult.riskFactors.forEach(factor => 
@@ -588,6 +592,48 @@ X_test.forEach((test, index) => {
     console.log('\n' + '='.repeat(50));
 });
 
+// Weghted Ensemble
+export function calculateFinalCreditScore(nnScore, regressionNNScore, ordinalNNScore, ficoScore, xgbScore) {
+    const threshold = 680;
+    // Calculate absolute differences from ficoScore
+    const diffNN = Math.abs(nnScore - ficoScore);
+    const diffReg = Math.abs(regressionNNScore - ficoScore);
+    const diffOrd = Math.abs(ordinalNNScore - ficoScore);
+    
+    // Calculate weights (inverse of differences, with small epsilon to avoid division by zero)
+    const epsilon = 1e-6;
+    const weightNN = 1 / (diffNN + epsilon);
+    const weightReg = 1 / (diffReg + epsilon);
+    const weightOrd = 1 / (diffOrd + epsilon);
+    
+    // Normalize weights to sum to 1
+    const totalWeight = weightNN + weightReg + weightOrd;
+    const normalizedWeightNN = weightNN / totalWeight;
+    const normalizedWeightReg = weightReg / totalWeight;
+    const normalizedWeightOrd = weightOrd / totalWeight;
+    
+    // Calculate weighted average
+    const weightedAverage = (nnScore * normalizedWeightNN +
+                            regressionNNScore * normalizedWeightReg +
+                            ordinalNNScore * normalizedWeightOrd);
+
+    // Return ficoScore if conditions are met
+    if (xgbScore > 0.5 && weightedAverage < threshold && ficoScore > threshold) {
+        return ficoScore.toFixed(0) > threshold + 10 ? threshold + 10 : ficoScore.toFixed(0);
+    }
+
+    // Return double weighted score if conditions are met
+    if (xgbScore < 0.5 && weightedAverage < threshold && ficoScore > threshold) {
+        return ( 0.975 * ((weightedAverage + ficoScore)/2)).toFixed(0);
+    }
+    
+    // Return weighted average
+    return weightedAverage.toFixed(0);
+}
+
+function XcalculateFinalCreditScore(nnScore, regressionNNScore, ordinalNNScore, ficoScore, xgbScore) {
+    return ((nnScore + regressionNNScore + ordinalNNScore)/3).toFixed(0);
+}
 
 /**
  * Makes predictions using all available models and returns results in API-friendly JSON format
@@ -598,7 +644,7 @@ X_test.forEach((test, index) => {
  */
 export function predictAll(features) {
     // Get XGBoost prediction
-    const xgbProbability = model.predict([features])[0];
+    const xgbProbability = model.predictSingle(features)[0];
     const xgbScore = probabilityToCreditScore(xgbProbability);
 
     // Get neural network prediction
@@ -609,6 +655,9 @@ export function predictAll(features) {
     // Get other model predictions
     const regressionResult = regressor.predict(features);
     const ordinalResult = ordinalClassifier.predict(features);
+
+    //OG prediction
+    const ficoScore = calculateStandardizedScore(features);
 
     // Prepare features for interest rate model
     const interestRateFeatures = {
@@ -667,7 +716,7 @@ export function predictAll(features) {
                 confidence: rateResult.confidence,
                 riskFactors: rateResult.riskFactors
             },
-            finalScore: Math.round((0.995 * (nnScore + regressionResult.score + (0.95 * ordinalResult.score)) / 3))
+            finalScore: calculateFinalCreditScore(nnScore, regressionResult.score, ordinalResult.score, ficoScore, xgbProbability)
         },
         thresholdsMet: checkThresholds(features),
         standardizedScore: calculateStandardizedScore(features)
