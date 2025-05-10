@@ -15,9 +15,9 @@ class CreditRegressor {
     constructor() {
         this.nn = new NeuralNetwork(
             8,              // input features
-            [32, 16, 8],   // hidden layers
+            [32, 16, 16, 8],   // hidden layers
             1,              // output (credit score)
-            'sigmoid'
+            'swish'
         );
     }
 

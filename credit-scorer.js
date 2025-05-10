@@ -644,7 +644,7 @@ function XcalculateFinalCreditScore(nnScore, regressionNNScore, ordinalNNScore, 
  */
 export function predictAll(features) {
     // Get XGBoost prediction
-    const xgbProbability = model.predictSingle(features)[0];
+    const xgbProbability = model.predictSingle(features);
     const xgbScore = probabilityToCreditScore(xgbProbability);
 
     // Get neural network prediction
@@ -661,10 +661,11 @@ export function predictAll(features) {
 
     // Prepare features for interest rate model
     const interestRateFeatures = {
-        xgboostScore: xgbScore,
+        xgboostScore: xgbProbability,
         nnScore: nnScore,
         regressionScore: regressionResult.score,
         ordinalScore: ordinalResult.score,
+        ficoScore: ficoScore,
         paymentHistory: features[2],
         creditUtilization: features[7],
         cashReserves: features[3],
@@ -690,7 +691,7 @@ export function predictAll(features) {
         predictions: {
             xgboost: {
                 probability: xgbProbability,
-                score: xgbScore,
+                //score: xgbScore,
                 category: xgbProbability >= 0.5 ? 'GOOD' : 'BAD'
             },
             neuralNetwork: {
@@ -707,19 +708,19 @@ export function predictAll(features) {
                 score: ordinalResult.score,
                 category: ordinalResult.category,
                 range: ordinalResult.range,
-                confidence: ordinalResult.confidence,
-                rawPredictions: ordinalResult.predictions
+                //confidence: ordinalResult.confidence,
+                //rawPredictions: ordinalResult.predictions
             },
             interestRate: {
                 baseRate: rateResult.baseRate,
                 finalRate: rateResult.adjustedRate,
-                confidence: rateResult.confidence,
+                riskMultiplier: rateResult.riskMultiplier,
                 riskFactors: rateResult.riskFactors
             },
             finalScore: calculateFinalCreditScore(nnScore, regressionResult.score, ordinalResult.score, ficoScore, xgbProbability)
         },
         thresholdsMet: checkThresholds(features),
-        standardizedScore: calculateStandardizedScore(features)
+        standardizedFICOScore: calculateStandardizedScore(features)
     };
 }
 
