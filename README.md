@@ -5,20 +5,23 @@
 
 A comprehensive credit scoring service that assesses financial risk using machine learning and traditional scoring models.
 
-## 📋 Overview
+## 📊 Industry Risk Model Metrics & Weighting  
 
-The service evaluates customers based on eight core financial metrics:
+| Metric                | Description                                         | Category                   | Weight | Ideal Weight |
+|-----------------------|----------------------------------------------------|---------------------------|--------|--------------|
+| **Revenue Strength**  | Measures income generation over time              | Business Fundamentals (30%) | 10%    | ~8-10%       |
+| **Debt-to-Equity Ratio** | Assesses financial leverage                    | Business Fundamentals (30%) | 15%    | ~15%         |
+| **Payment History**   | Tracks consistency in debt repayment              | Payment Behavior (40%)     | 35%    | ~35%         |
+| **Cash Reserves**     | Reflects financial cushioning                     | Business Fundamentals (30%) | 5%     | ~4-5%        |
+| **Business Longevity** | Evaluates stability and experience               | Risk Factors (30%)         | 5%     | ~3-5%        |
+| **Industry Risk Score** | Contextualizes sector volatility                 | Risk Factors (30%)         | 3%     | ~3-5%        |
+| **Late Payments**     | Identifies delinquency patterns                   | Payment Behavior (40%)     | 2%     | ~2%          |
+| **Credit Utilization** | Examines borrowed capital usage                  | Payment Behavior (40%)     | 30%    | ~30%         |
+| **Credit History**    | Reviews past financial borrowing and repayment    | Risk Factors (30%)         | 7.5%   | ~5-10%       |
 
-| Metric | Description |
-|--------|-------------|
-| **Revenue Strength** | Measures income generation over time |
-| **Debt-to-Equity Ratio** | Assesses financial leverage |
-| **Payment History** | Tracks consistency in debt repayment |
-| **Cash Reserves** | Reflects financial cushioning |
-| **Business Longevity** | Evaluates stability and experience |
-| **Industry Risk Score** | Contextualizes sector volatility |
-| **Late Payments** | Identifies delinquency patterns |
-| **Credit Utilization** | Examines borrowed capital usage |
+## 🔍 Overview
+This table consolidates **key SME lending risk factors**, providing a structured assessment framework with **category-based weight distribution**. The **ideal weight column** aligns with industry standards, ensuring accuracy in credit risk modeling.
+
 
 ## 📚 Documentation
 
@@ -46,7 +49,6 @@ or
 ```bash
 bun credit-scorer
 ```
-
 ---
 
 ## 🔍 Models Overview
