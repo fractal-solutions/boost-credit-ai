@@ -7,21 +7,20 @@ A comprehensive credit scoring service that assesses financial risk using machin
 
 ## 📊 Industry Risk Model Metrics & Weighting  
 
-| Metric                | Description                                         | Category                   | Weight | Ideal Weight |
-|-----------------------|----------------------------------------------------|---------------------------|--------|--------------|
-| **Revenue Strength**  | Measures income generation over time              | Business Fundamentals (30%) | 10%    | ~8-10%       |
-| **Debt-to-Equity Ratio** | Assesses financial leverage                    | Business Fundamentals (30%) | 15%    | ~15%         |
-| **Payment History**   | Tracks consistency in debt repayment              | Payment Behavior (40%)     | 35%    | ~35%         |
-| **Cash Reserves**     | Reflects financial cushioning                     | Business Fundamentals (30%) | 5%     | ~4-5%        |
-| **Business Longevity** | Evaluates stability and experience               | Risk Factors (30%)         | 5%     | ~3-5%        |
-| **Industry Risk Score** | Contextualizes sector volatility                 | Risk Factors (30%)         | 3%     | ~3-5%        |
-| **Late Payments**     | Identifies delinquency patterns                   | Payment Behavior (40%)     | 2%     | ~2%          |
-| **Credit Utilization** | Examines borrowed capital usage                  | Payment Behavior (40%)     | 30%    | ~30%         |
-| **Credit History**    | Reviews past financial borrowing and repayment    | Risk Factors (30%)         | 7.5%   | ~5-10%       |
+| Metric                | Description                                         | Weight | Ideal Weight | Category                   |
+|-----------------------|----------------------------------------------------|--------|--------------|---------------------------|
+| **Revenue Strength**  | Measures income generation over time              | 10%    | ~8-10%       | Business Fundamentals (30%) |
+| **Debt-to-Equity Ratio** | Assesses financial leverage                    | 15%    | ~15%         | Business Fundamentals (30%) |
+| **Payment History**   | Tracks consistency in debt repayment              | 35%    | ~35%         | Payment Behavior (40%)     |
+| **Cash Reserves**     | Reflects financial cushioning                     | 5%     | ~4-5%        | Business Fundamentals (30%) |
+| **Business Longevity** | Evaluates stability and experience               | 5%     | ~3-5%        | Risk Factors (30%)         |
+| **Industry Risk Score** | Contextualizes sector volatility                 | 3%     | ~3-5%        | Risk Factors (30%)         |
+| **Late Payments**     | Identifies delinquency patterns                   | 2%     | ~2%          | Payment Behavior (40%)     |
+| **Credit Utilization** | Examines borrowed capital usage                  | 30%    | ~30%         | Payment Behavior (40%)     |
+| **Credit History**    | Reviews past financial borrowing and repayment    | 7.5%   | ~5-10%       | Risk Factors (30%)         |
 
 ## 🔍 Overview
-This table consolidates **key SME lending risk factors**, providing a structured assessment framework with **category-based weight distribution**. The **ideal weight column** aligns with industry standards, ensuring accuracy in credit risk modeling.
-
+This table provides a **structured credit risk assessment framework**, ensuring **balanced weight distribution** across **payment behavior, business fundamentals, and risk factors**. The **ideal weight column** helps maintain industry-aligned scoring.
 
 ## 📚 Documentation
 
