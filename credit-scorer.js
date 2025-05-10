@@ -18,27 +18,27 @@ const THRESHOLDS = {
 //FICO SBSS Model weights
 const MODIFIED_SBSS_WEIGHTS = {
     PAYMENT_BEHAVIOR: {
-        weight: 0.35,
+        weight: 0.40,
         metrics: {
-            paymentHistory: 0.50,
-            latePayments: 0.15,
-            creditUtilization: 0.35
+            paymentHistory: 0.60,
+            latePayments: 0.10,
+            creditUtilization: 0.30
         }
     },
     BUSINESS_FUNDAMENTALS: {
-        weight: 0.35,
+        weight: 0.30,
         metrics: {
-            annualRevenue: 0.30,
-            cashReserves: 0.35,
-            debtToEquity: 0.35
+            annualRevenue: 0.40,
+            cashReserves: 0.25,
+            debtToEquity: 0.40
         }
     },
     RISK_FACTORS: {
         weight: 0.30,
         metrics: {
-            industryRisk: 0.40,
-            yearsInBusiness: 0.35,
-            creditHistory: 0.25
+            industryRisk: 0.35,
+            yearsInBusiness: 0.45,
+            creditHistory: 0.20
         }
     }
 };
@@ -48,10 +48,10 @@ export const FEATURE_RANGES = [
     [0, 50],    // Annual Revenue
     [0, 3],     // Debt to Equity
     [0, 1],     // Payment History
-    [0, 5],     // Cash Reserves
-    [0, 15],    // Years in Business
+    [0, 10],     // Cash Reserves
+    [0, 25],    // Years in Business
     [0, 10],    // Industry Risk
-    [0, 12],    // Late Payments
+    [0, 20],    // Late Payments
     [0, 1]      // Credit Utilization
 ];
 
@@ -162,7 +162,7 @@ const model = new XGBoost({
 // Train the model with binary labels
 model.fit(processedX_train, y_train);
 
-// Update test data with scenario descriptions
+// Test data with scenario descriptions
 const X_test = [
     {
         features: [5.0, 0.5, 0.94, 0.8, 4, 4, 1, 0.4],
@@ -354,69 +354,81 @@ function calculateBaseScore(features, thresholds, raw = false) {
     ));
 }
 
-function calculateStandardizedScore(features) {
+export function calculateStandardizedScore(features) {
     // Base score starts at 300
     let baseScore = 300;
     const maxPoints = 550; // Points available above base score
     
     // Payment Behavior (35% of additional points = 192.5 points)
+    const paymentPoints = MODIFIED_SBSS_WEIGHTS.PAYMENT_BEHAVIOR.weight * maxPoints;
     const paymentScore = (
-        // Payment history (50% of 192.5 = 96.25 points)
+        // Payment history
         (features[2] >= 0.95 ? 1.0 : 
          features[2] >= 0.90 ? 0.8 :
          features[2] >= 0.85 ? 0.6 :
-         features[2] >= 0.80 ? 0.4 : 0.2) * 96.25 +
+         features[2] >= 0.80 ? 0.4 : 0.2) * 
+         (paymentPoints * MODIFIED_SBSS_WEIGHTS.PAYMENT_BEHAVIOR.metrics.paymentHistory) +
         
-        // Late payments (30% of 192.5 = 57.75 points)
-        ((THRESHOLDS.MAX_LATE_PAYMENTS - features[6]) / THRESHOLDS.MAX_LATE_PAYMENTS) * 57.75 +
+        // Late payments 
+        ((THRESHOLDS.MAX_LATE_PAYMENTS - features[6]) / THRESHOLDS.MAX_LATE_PAYMENTS) * 
+         (paymentPoints * MODIFIED_SBSS_WEIGHTS.PAYMENT_BEHAVIOR.metrics.latePayments) +
         
-        // Credit utilization (20% of 192.5 = 38.5 points)
+        // Credit utilization
         (features[7] <= 0.3 ? 1.0 :
          features[7] <= 0.5 ? 0.8 :
          features[7] <= 0.7 ? 0.6 :
-         features[7] <= 0.8 ? 0.4 : 0.2) * 38.5
+         features[7] <= 0.8 ? 0.4 : 0.2) * 
+         (paymentPoints * MODIFIED_SBSS_WEIGHTS.PAYMENT_BEHAVIOR.metrics.creditUtilization) 
     );
 
     // Business Fundamentals (35% of additional points = 192.5 points)
+    const businessPoints = MODIFIED_SBSS_WEIGHTS.BUSINESS_FUNDAMENTALS.weight * maxPoints;
     const businessScore = (
-        // Annual revenue (40% of 192.5 = 77 points)
+        // Annual revenue 
         (features[0] >= THRESHOLDS.MIN_ANNUAL_REVENUE * 5 ? 1.0 :
          features[0] >= THRESHOLDS.MIN_ANNUAL_REVENUE * 3 ? 0.8 :
          features[0] >= THRESHOLDS.MIN_ANNUAL_REVENUE * 2 ? 0.6 :
-         features[0] >= THRESHOLDS.MIN_ANNUAL_REVENUE ? 0.4 : 0.2) * 77 +
+         features[0] >= THRESHOLDS.MIN_ANNUAL_REVENUE ? 0.4 : 0.2) * 
+         (businessPoints * MODIFIED_SBSS_WEIGHTS.BUSINESS_FUNDAMENTALS.metrics.annualRevenue) +
         
-        // Cash reserves (35% of 192.5 = 67.375 points)
+        // Cash reserves 
         (features[3] >= THRESHOLDS.MIN_CASH_RESERVES * 3 ? 1.0 :
          features[3] >= THRESHOLDS.MIN_CASH_RESERVES * 2 ? 0.8 :
          features[3] >= THRESHOLDS.MIN_CASH_RESERVES * 1.5 ? 0.6 :
-         features[3] >= THRESHOLDS.MIN_CASH_RESERVES ? 0.4 : 0.2) * 67.375 +
+         features[3] >= THRESHOLDS.MIN_CASH_RESERVES ? 0.4 : 0.2) * 
+         (businessPoints * MODIFIED_SBSS_WEIGHTS.BUSINESS_FUNDAMENTALS.metrics.cashReserves) +
         
-        // Debt to equity (25% of 192.5 = 48.125 points)
+        // Debt to equity 
         (features[1] <= THRESHOLDS.MAX_DEBT_TO_EQUITY * 0.5 ? 1.0 :
          features[1] <= THRESHOLDS.MAX_DEBT_TO_EQUITY * 0.75 ? 0.8 :
          features[1] <= THRESHOLDS.MAX_DEBT_TO_EQUITY ? 0.6 :
-         features[1] <= THRESHOLDS.MAX_DEBT_TO_EQUITY * 1.5 ? 0.4 : 0.2) * 48.125
+         features[1] <= THRESHOLDS.MAX_DEBT_TO_EQUITY * 1.5 ? 0.4 : 0.2) * 
+         (businessPoints * MODIFIED_SBSS_WEIGHTS.BUSINESS_FUNDAMENTALS.metrics.debtToEquity)
     );
 
     // Risk Factors (30% of additional points = 165 points)
+    const riskPoints = MODIFIED_SBSS_WEIGHTS.RISK_FACTORS.weight * maxPoints;
     const riskScore = (
-        // Industry risk (40% of 165 = 66 points)
+        // Industry risk 
         (features[5] <= THRESHOLDS.MAX_INDUSTRY_RISK * 0.5 ? 1.0 :
          features[5] <= THRESHOLDS.MAX_INDUSTRY_RISK * 0.75 ? 0.8 :
          features[5] <= THRESHOLDS.MAX_INDUSTRY_RISK ? 0.6 :
-         features[5] <= THRESHOLDS.MAX_INDUSTRY_RISK * 1.25 ? 0.4 : 0.2) * 66 +
+         features[5] <= THRESHOLDS.MAX_INDUSTRY_RISK * 1.25 ? 0.4 : 0.2) * 
+         (riskPoints * MODIFIED_SBSS_WEIGHTS.RISK_FACTORS.metrics.industryRisk) +
         
-        // Years in business (35% of 165 = 57.75 points)
+        // Years in business 
         (features[4] >= THRESHOLDS.MIN_YEARS_IN_BUSINESS * 3 ? 1.0 :
          features[4] >= THRESHOLDS.MIN_YEARS_IN_BUSINESS * 2 ? 0.8 :
          features[4] >= THRESHOLDS.MIN_YEARS_IN_BUSINESS * 1.5 ? 0.6 :
-         features[4] >= THRESHOLDS.MIN_YEARS_IN_BUSINESS ? 0.4 : 0.2) * 57.75 +
+         features[4] >= THRESHOLDS.MIN_YEARS_IN_BUSINESS ? 0.4 : 0.2) * 
+         (riskPoints * MODIFIED_SBSS_WEIGHTS.RISK_FACTORS.metrics.yearsInBusiness) +
         
-        // Credit history using payment history (25% of 165 = 41.25 points)
+        // Credit history using payment history
         (features[2] >= 0.95 ? 1.0 :
          features[2] >= 0.90 ? 0.8 :
          features[2] >= 0.85 ? 0.6 :
-         features[2] >= 0.80 ? 0.4 : 0.2) * 41.25
+         features[2] >= 0.80 ? 0.4 : 0.2) * 
+         (riskPoints * MODIFIED_SBSS_WEIGHTS.RISK_FACTORS.metrics.creditHistory)
     );
 
     // Debug logging
@@ -430,6 +442,7 @@ function calculateStandardizedScore(features) {
     const finalScore = Math.round(baseScore + paymentScore + businessScore + riskScore);
     return Math.min(850, Math.max(300, finalScore));
 }
+
 
 // Function to normalize features
 export function normalizeFeatures(features) {
