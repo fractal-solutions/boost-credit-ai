@@ -121,13 +121,35 @@ const X_train = [
     ]
 ];
 
+import { promises as fs } from 'fs';
+import path from 'path';
+
 // Flatten the nested arrays into a single training set
 const flattenedX_train = X_train.reduce((acc, curr) => acc.concat(curr), []);
 
 // Group the data into rows of 8 features each
-const processedX_train = [];
-for (let i = 0; i < flattenedX_train.length; i += 8) {
-    processedX_train.push(flattenedX_train.slice(i, i + 8));
+let processedX_train;
+try {
+    // Check if data directory exists, create if not
+    await fs.mkdir(path.join(process.cwd(), 'data'), { recursive: true });
+    
+    // Try to load training data
+    const data = await fs.readFile(path.join(process.cwd(), 'data', 'trainingset.json'), 'utf8');
+    processedX_train = JSON.parse(data);
+    console.log('Loaded training data from file');
+} catch (err) {
+    // File doesn't exist or error reading - create new data
+    processedX_train = [];
+    for (let i = 0; i < flattenedX_train.length; i += 8) {
+        processedX_train.push(flattenedX_train.slice(i, i + 8));
+    }
+    
+    // Save to file for next time
+    await fs.writeFile(
+        path.join(process.cwd(), 'data', 'trainingset.json'),
+        JSON.stringify(processedX_train, null, 2)
+    );
+    console.log('Saved new training data to file');
 }
 
 // Calculate binary credit scores (1 for good, 0 for bad) based on all factors
@@ -473,24 +495,6 @@ const nnTrainingData = normalizedX_train.map((normalizedFeatures, index) => {
     };
 });
 
-// Initialize neural network
-const nn = new NeuralNetwork(
-    8,              // input size (number of features)
-    [16, 10],        // hidden layers
-    1,              // output size (credit score)
-    'swish'         // activation function
-);
-
-// Train neural network
-console.log('\nTraining Generic Neural Network...');
-nn.train(nnTrainingData, 0.001, 3000, true);
-
-
-//NEURAL NETWORK MODELS
-// Initialize models
-const regressor = new CreditRegressor();
-const ordinalClassifier = new OrdinalCreditClassifier();
-
 // Convert binary scores to credit scores using base score calculation
 const creditScores = processedX_train.map(features => 
     calculateBaseScore(features, THRESHOLDS, true)
@@ -499,7 +503,22 @@ const creditScoresFICO = processedX_train.map(features =>
     calculateStandardizedScore(features)//, THRESHOLDS, false)
 );
 
-// Train both models
+//NEURAL NETWORK MODELS
+// Initialize models
+const nn = new NeuralNetwork(
+    8,              // input size (number of features)
+    [16, 10],        // hidden layers
+    1,              // output size (credit score)
+    'swish'         // activation function
+);
+const regressor = new CreditRegressor();
+const ordinalClassifier = new OrdinalCreditClassifier();
+
+
+
+// Train all models
+console.log('\nTraining Generic Neural Network...');
+nn.train(nnTrainingData, 0.001, 3000, true);
 console.log('\nTraining Regressor Neural Network...');
 regressor.train(processedX_train, creditScoresFICO);
 console.log('\nTraining Ordinal Classifier Neural Network...');
@@ -741,6 +760,144 @@ export function predictAll(features) {
 Bun.serve({
   port: 2226,
   routes: {
+    // Individual model prediction endpoints
+    "/predict/xgboost": {
+      POST: async (req) => {
+        try {
+          const body = await req.json();
+          if (!body.features || !Array.isArray(body.features)) {
+            return Response.json(
+              { error: "Features array is required" },
+              { status: 400 }
+            );
+          }
+          
+          if (body.features.length !== 8) {
+            return Response.json(
+              { error: "Exactly 8 features are required" },
+              { status: 400 }
+            );
+          }
+          
+          const probability = model.predictSingle(body.features);
+          return Response.json({
+            success: true,
+            prediction: {
+              probability,
+              category: probability >= 0.5 ? 'GOOD' : 'BAD'
+            }
+          });
+          
+        } catch (error) {
+          return Response.json(
+            { error: error.message },
+            { status: 500 }
+          );
+        }
+      }
+    },
+    
+    "/predict/neuralNetwork": {
+      POST: async (req) => {
+        try {
+          const body = await req.json();
+          if (!body.features || !Array.isArray(body.features)) {
+            return Response.json(
+              { error: "Features array is required" },
+              { status: 400 }
+            );
+          }
+          
+          if (body.features.length !== 8) {
+            return Response.json(
+              { error: "Exactly 8 features are required" },
+              { status: 400 }
+            );
+          }
+          
+          const normalizedFeatures = normalizeFeatures(body.features);
+          const normalizedPrediction = nn.forward(normalizedFeatures)[0];
+          const score = denormalizeCreditScore(normalizedPrediction);
+          
+          return Response.json({
+            success: true,
+            prediction: {
+              score: score > 850 ? 850 : score,
+              category: score >= 680 ? 'GOOD' : 'BAD',
+              rawOutput: normalizedPrediction
+            }
+          });
+          
+        } catch (error) {
+          return Response.json(
+            { error: error.message },
+            { status: 500 }
+          );
+        }
+      }
+    },
+    
+    "/predict/regression": {
+      POST: async (req) => {
+        try {
+          const body = await req.json();
+          if (!body.features || !Array.isArray(body.features)) {
+            return Response.json(
+              { error: "Features array is required" },
+              { status: 400 }
+            );
+          }
+          
+          const result = regressor.predict(body.features);
+          return Response.json({
+            success: true,
+            prediction: {
+              score: result.score,
+              category: result.category,
+              range: result.range
+            }
+          });
+          
+        } catch (error) {
+          return Response.json(
+            { error: error.message },
+            { status: 500 }
+          );
+        }
+      }
+    },
+    
+    "/predict/ordinalClassification": {
+      POST: async (req) => {
+        try {
+          const body = await req.json();
+          if (!body.features || !Array.isArray(body.features)) {
+            return Response.json(
+              { error: "Features array is required" },
+              { status: 400 }
+            );
+          }
+          
+          const result = ordinalClassifier.predict(body.features);
+          return Response.json({
+            success: true,
+            prediction: {
+              score: result.score,
+              category: result.category,
+              range: result.range
+            }
+          });
+          
+        } catch (error) {
+          return Response.json(
+            { error: error.message },
+            { status: 500 }
+          );
+        }
+      }
+    },
+    
+    // Original consolidated prediction endpoint
     "/predict": {
       POST: async (req) => {
         try {
@@ -777,6 +934,88 @@ Bun.serve({
         }
       }
     },
+
+    "/add-training-data": {
+      POST: async (req) => {
+        try {
+          const body = await req.json();
+          
+          // Validate input
+          if (!body.features || !Array.isArray(body.features)) {
+            return Response.json(
+              { error: "Features array is required" },
+              { status: 400 }
+            );
+          }
+          
+          if (body.features.length !== 8) {
+            return Response.json(
+              { error: "Exactly 8 features are required" },
+              { status: 400 }
+            );
+          }
+
+          // Read existing training data
+          const trainingData = JSON.parse(
+            await fs.readFile(path.join(process.cwd(), 'data', 'trainingset.json'), 'utf8')
+          );
+
+          // Append new features
+          trainingData.push(body.features);
+
+          // Write back to file
+          await fs.writeFile(
+            path.join(process.cwd(), 'data', 'trainingset.json'),
+            JSON.stringify(trainingData, null, 2)
+          );
+
+          return Response.json({
+            success: true,
+            message: "Training data added successfully"
+          });
+          
+        } catch (error) {
+          return Response.json(
+            { error: error.message },
+            { status: 500 }
+          );
+        }
+      }
+    },
+
+    "/update": {
+      POST: async () => {
+        try {
+          const result = await updateNNModels();
+          return Response.json({
+            success: true,
+            message: "Neural network models updated successfully",
+            result: {
+              trainingDataSize: result.trainingData.length
+            }
+          });
+        } catch (error) {
+          return Response.json(
+            { error: error.message },
+            { status: 500 }
+          );
+        }
+      }
+    },
+
+    // Serve panel.html
+    "/panel": {
+        GET: async () => {
+        try {
+            const html = await fs.readFile(path.join(process.cwd(), 'panel.html'), 'utf8');
+            return new Response(html, {
+            headers: { 'Content-Type': 'text/html' }
+            });
+        } catch (error) {
+            return new Response("Error loading panel", { status: 500 });
+        }
+        }
+    },
     
     // Health check endpoint
     "/health": new Response("OK"),
@@ -784,6 +1023,8 @@ Bun.serve({
     // 404 handler for unmatched API routes
     "/*": Response.json({ message: "Not found" }, { status: 404 }),
   },
+  
+
   
   // Fallback for non-API routes
   fetch(req) {
@@ -797,3 +1038,99 @@ POST /predict
 {
   "features": [5.0, 0.5, 0.94, 0.8, 4, 4, 1, 0.4]
 }`);
+
+/**
+ * Updates all neural network models with latest training data
+ * Loads training data, prepares features, and trains:
+ * - Generic neural network (using base score)
+ * - Regressor model (using standardized score)
+ * - Ordinal classifier (using standardized score)
+ */
+export async function updateNNModels() {
+    try {
+        // Load training data
+        const data = await fs.readFile(path.join(process.cwd(), 'data', 'trainingset.json'), 'utf8');
+        const processedX_train = JSON.parse(data);
+        
+
+        // Prepare data for generic neural network (base score)
+        const normalizedX_train = processedX_train.map(features =>
+            normalizeFeatures(features)
+        );
+        const nnTrainingData = normalizedX_train.map((normalizedFeatures, index) => {
+            const baseScore = calculateBaseScore(processedX_train[index], THRESHOLDS, true);
+            const normalizedScore = (baseScore - 0) / (800 - 0);
+            return {
+                input: normalizedFeatures,
+                output: [normalizedScore]
+            };
+        });
+
+        // Prepare data for regressor/ordinal models (standardized score)
+        const creditScoresFICO = processedX_train.map(features =>
+            calculateStandardizedScore(features)
+        );
+
+        // Initialize models
+        //const nn = new NeuralNetwork(8, [16, 10], 1, 'swish');
+        //const regressor = new CreditRegressor();
+        //const ordinalClassifier = new OrdinalCreditClassifier();
+
+        // Train models
+        console.log('\nTraining Generic Neural Network...');
+        nn.train(nnTrainingData, 0.001, 3000, true);
+        
+        console.log('\nTraining Regressor Neural Network...');
+        regressor.train(processedX_train, creditScoresFICO);
+        
+        console.log('\nTraining Ordinal Classifier Neural Network...');
+        ordinalClassifier.train(processedX_train, creditScoresFICO);
+
+        // Run tests on X_test
+        console.log('\nRunning Tests on Updated Models:');
+        
+        X_test.forEach((test, index) => {
+            const features = test.features;
+            const xgbProbability = model.predictSingle(features);
+            const normalizedFeatures = normalizeFeatures(test.features);
+            const normalizedPrediction = nn.forward(normalizedFeatures)[0];
+            const nnScore = denormalizeCreditScore(normalizedPrediction);
+            
+            const regressionResult = regressor.predict(test.features);
+            const ordinalResult = ordinalClassifier.predict(test.features);
+            const ficoScore = calculateStandardizedScore(test.features);
+
+            
+            console.log('============================\n');
+            console.log('============================');
+            console.log(`Test ${index + 1}: ${test.scenario}`);
+            console.log('Business Metrics:');
+            console.log(`- Annual Revenue: KES ${features[0]}M`);
+            console.log(`- Debt to Equity: ${features[1]}`);
+            console.log(`- Payment History: ${(features[2] * 100).toFixed(1)}%`);
+            console.log(`- Cash Reserves: KES ${features[3]}M`);
+            console.log(`- Years in Business: ${features[4]}`);
+            console.log(`- Industry Risk Score: ${features[5]}/10`);
+            console.log(`- Late Payments: ${features[6]}`);
+            console.log(`- Credit Utilization: ${(features[7] * 100).toFixed(1)}%`);
+            console.log(`\nResults: `);
+            console.log(`- XGBoost Category: ${xgbProbability >= 0.5 ? 'GOOD' : 'BAD'}`);
+            console.log(`- NN Score: ${nnScore}`);
+            console.log(`- Regressor Score: ${regressionResult.score}`);
+            console.log(`- Ordinal Category: ${ordinalResult.category}`);
+            console.log(`- FICO Score: ${ficoScore}`);
+            console.log(`\nFINAL CREDIT SCORE: ${calculateFinalCreditScore(nnScore, regressionResult.score, ordinalResult.score, ficoScore, xgbProbability)}`); //(0.995 * (nnScore + regressionResult.score + ordinalResult.score) / 3).toFixed(0)}`);
+
+        });
+
+        return {
+            nn,
+            regressor,
+            ordinalClassifier,
+            trainingData: processedX_train
+        };
+    } catch (error) {
+        console.error('Error updating models:', error);
+        throw error;
+    }
+}

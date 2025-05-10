@@ -115,13 +115,26 @@ The FICO SBSS model uses the following hierarchical weighting structure:
 
 ## Technical Implementation
 
-### API Endpoints  
-- **POST /predict** - Accepts financial metrics as input and returns comprehensive credit score predictions  
-  - Input format: JSON array of 8 feature values in order:  
-    `[annualRevenue, debtToEquity, paymentHistory, cashReserves, yearsInBusiness, industryRisk, latePayments, creditUtilization]`  
-  - Returns: JSON response with predictions from all models and final score  
+### API Endpoints
+- **POST /predict** - Accepts financial metrics as input and returns comprehensive credit score predictions
+  - Input format: JSON array of 8 feature values in order:
+    `[annualRevenue, debtToEquity, paymentHistory, cashReserves, yearsInBusiness, industryRisk, latePayments, creditUtilization]`
+  - Returns: JSON response with predictions from all models and final score
 
-- **GET /health** - Health check endpoint  
+- **POST /add-training-data** - Adds new training data to improve model accuracy
+  - Input format: Same as /predict endpoint
+  - Returns: Success message
+
+- **POST /update** - Triggers retraining of neural network models with latest training data
+  - No input required
+  - Returns: Status of model updates
+
+- **GET /health** - Health check endpoint
+
+- **GET /panel** - Serves administration panel interface
+  - Returns: HTML content for the management dashboard
+  - Authentication: None required
+  - Purpose: Provides visual interface for monitoring and managing the scoring service
 
 ---
 
