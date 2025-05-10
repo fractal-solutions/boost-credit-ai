@@ -125,6 +125,12 @@
         /* Feature importance chart */
         .feature-chart {
             margin-top: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            transform: scale(0.7);
+            transform-origin: top left;
+            width: 142.857%; /* Counteract the scale to maintain layout */
         }
         .feature-bar {
             height: 20px;
@@ -178,23 +184,28 @@
         .clickable-row:hover {
             background-color: #f0f8ff !important;
         }
-/* Sticky header styles */
-.action-buttons {
-    margin-bottom: 20px;
-}
+        /* Sticky header styles */
+        .action-buttons {
+            margin-bottom: 20px;
+        }
 
-.sticky-header {
-    position: sticky;
-    top: 0;
-    background-color: #f5f5f5;
-    z-index: 100;
-    padding-bottom: 20px;
-}
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            background-color: #f5f5f5;
+            z-index: 100;
+            padding-bottom: 20px;
+            max-height: calc(50vh - 110px);
+        }
 
-.scrollable-content {
-    max-height: calc(100vh - 560px);
-    overflow-y: auto;
-}
+        .stuck {
+            max-height: calc(50vh - 230px);
+        }
+
+        .scrollable-content {
+            max-height: calc(100vh - 560px);
+            overflow-y: auto;
+        }
         
     </style>
 </head>
@@ -213,21 +224,21 @@
             </div>
             
             <div class="dashboard">
-                <div class="card">
+                <div class="card stuck">
                     <h2>Credit Score Overview</h2>
                     <div id="scoreOverview">
                         <div class="loading">Run prediction to see results</div>
                     </div>
                 </div>
                 
-                <div class="card">
+                <div class="card stuck">
                     <h2>Feature Importance</h2>
                     <div id="featureImportance">
                         <div class="loading">Feature importance will appear here</div>
                     </div>
                 </div>
                 
-                <div class="card">
+                <div class="card stuck">
                     <h2>Score Visualization</h2>
                     <div id="scoreVisualization">
                         <div class="score-visual">
@@ -436,32 +447,30 @@
         function updateFeatureImportance(prediction) {
             const featureEl = document.getElementById('featureImportance');
             
-            // Sort features by importance (using standardized score calculation weights)
-            const featureWeights = [
-                0.4 * 0.4,  // Annual Revenue (Business Fundamentals - annualRevenue)
-                0.4 * 0.4,  // Debt to Equity (Business Fundamentals - debtToEquity)
-                0.4 * 0.6,  // Payment History (Payment Behavior - paymentHistory)
-                0.4 * 0.25, // Cash Reserves (Business Fundamentals - cashReserves)
-                0.3 * 0.45, // Years in Business (Risk Factors - yearsInBusiness)
-                0.3 * 0.35, // Industry Risk (Risk Factors - industryRisk)
-                0.4 * 0.1,  // Late Payments (Payment Behavior - latePayments)
-                0.4 * 0.3   // Credit Utilization (Payment Behavior - creditUtilization)
-            ];
+            // Get feature values from prediction
+            const featureValues = featureNames.map(name => {
+                // Convert to camelCase to match API response keys
+                const key = name.replace(/(?:^\w|[A-Z]|\b\w|\s+)/g, (match, index) => {
+                    if (+match === 0) return ""; // skip spaces
+                    return index === 0 ? match.toLowerCase() : match.toUpperCase();
+                }).replace(/\s+/g, '');
+                return prediction.features[key];
+            });
             
-            // Normalize to 100%
-            const totalWeight = featureWeights.reduce((sum, weight) => sum + weight, 0);
-            const normalizedWeights = featureWeights.map(weight => (weight / totalWeight) * 100);
+            // Calculate max value for normalization
+            const maxValue = Math.max(...featureValues);
             
             let html = `<div class="feature-chart">`;
             featureNames.forEach((name, index) => {
-                const value = prediction.features[featureNames[index].toLowerCase().replace(/ /g, '')];
+                const value = featureValues[index];
+                const normalizedWidth = (value / maxValue) * 100;
                 html += `
                     <div>
                         <div style="display: flex; justify-content: space-between;">
                             <span>${name}</span>
                             <span>${formatFeatureValue(index, value)}</span>
                         </div>
-                        <div class="feature-bar" style="width: ${normalizedWeights[index]}%;"></div>
+                        <div class="feature-bar" style="width: ${normalizedWidth}%;"></div>
                     </div>
                 `;
             });
