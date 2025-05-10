@@ -68,7 +68,8 @@ The service is built on the FICO Small Business Scoring Service (SBSS) model, wh
 - Modified weights to better reflect our risk assessment priorities  
 - All metrics are normalized and weighted according to SBSS standards  
 
-#### 📊 Metric Weights  
+## Industry-Standard Credit Scoring Weight Adjustments
+The weight adjustments in credit scoring models are informed by **financial institutions, fintech trends, and regulatory frameworks**. These refinements ensure **accurate risk assessment** while optimizing lending decisions for SMEs.
 The FICO SBSS model uses the following hierarchical weighting structure:
 
 | Category                | Metric               | Weight Within Category | Total Weight | Ideal Weight |
@@ -84,24 +85,22 @@ The FICO SBSS model uses the following hierarchical weighting structure:
 |                         | Credit History       | 20%                   | 7.5%         | ~5-10%   |
 
 
-### Industry-Standard Credit Scoring Weight Adjustments
-The weight adjustments in credit scoring models are informed by **financial institutions, fintech trends, and regulatory frameworks**. These refinements ensure **accurate risk assessment** while optimizing lending decisions for SMEs.
 
 ### Sources Informing Weight Adjustments
 
 #### 1. **FICO SBSS Model**
-- Payment history weight increased to **60%**, as it is the strongest predictor of default risk.
+- Payment history weight adjusted to **60%**, as it is the strongest predictor of default risk.
 - Credit utilization weight adjusted to **30%**, ensuring balanced risk assessment.
 - Late payments reduced to **10%**, as their impact is more significant when coupled with poor payment behavior.
 
 #### 2. **Basel II & IFRS 9 Guidelines**
-- **Debt-to-equity ratio** increased to **40%**, reflecting financial stability and leverage concerns.
+- **Debt-to-equity ratio** adjusted to **40%**, reflecting financial stability and leverage concerns.
 - **Cash reserves** weight reduced to **20%**, prioritizing revenue generation over static liquidity.
 
 #### 3. **Fintech Lending Trends**
 - **Annual revenue** weight raised to **40%**, as fintech lenders rely on real-time earnings metrics.
 - **Industry risk** weight adjusted to **35%**, ensuring sector-specific volatility is considered.
-- **Years in business** weight increased to **45%**, linking business longevity to financial stability.
+- **Years in business** weight adjusted to **45%**, linking business longevity to financial stability.
 
 #### 4. **World Bank SME Credit Scoring Framework**
 - Aligns risk models with global lending best practices.
